@@ -20,6 +20,7 @@
 #include <stdlib.h> // Required for:
 #include <string.h> // Required for:
 #include <cmath>
+#include <array>
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -64,12 +65,12 @@ static void UpdateDrawFrame(void); // Update and Draw one frame
 
 constexpr float HEX_RADIUS{30.0};
 constexpr float HEX_ROT{30.0};
+constexpr float HEX_AXIS_THETA{60.0};
 constexpr float deg_to_rad(float f)
 {
     return f * (3.1415 / 180.0);
 }
 constexpr float HEX_ROT_RAD{deg_to_rad(HEX_ROT)};
-constexpr float HEX_AXIS_THETA{60};
 constexpr float HEX_AXIS_THETA_RAD{deg_to_rad(HEX_AXIS_THETA)};
 
 Vector2 hex_to_cartesian_space_v(Vector2 v)
@@ -80,6 +81,25 @@ Vector2 hex_to_cartesian_space_v(Vector2 v)
     return Vector2{
         .x = (dx_of_hx * v.x) + (dx_of_hy * v.y),
         .y = dy_of_hy * v.y};
+}
+
+constexpr Vector2 hex_neighbors[] = {
+    {1, 0},
+    {-1, 0},
+    {0, 1},
+    {0, -1},
+    {-1, 1},
+    {1, -1}};
+
+/// @brief Returns the distance (in pixels) between two hex coordiantes
+/// @param v1
+/// @param v2
+/// @return
+float hex_distance(Vector2 v1, Vector2 v2)
+{
+    auto cv1 = hex_to_cartesian_space_v(v1);
+    auto cv2 = hex_to_cartesian_space_v(v2);
+    return Vector2Length(Vector2Subtract(cv1, cv2));
 }
 
 void render_hex(int x, int y, Color color)
@@ -161,7 +181,14 @@ void UpdateDrawFrame(void)
     center.x = screenWidth / 2;
     center.y = screenHeight / 2;
 
-    int n = 12;
+    // for (auto hex : hex_neighbors)
+    // {
+    //     auto cart_space1 = Vector2Add(hex_to_cartesian_space_v(hex), center);
+    //     DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
+    //     DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, WHITE);
+    // }
+
+    int n = 10;
     for (int dhx = -n; dhx < n; dhx++)
     {
         for (int dhy = -n; dhy < n; dhy++)
@@ -176,6 +203,16 @@ void UpdateDrawFrame(void)
             {
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, BLACK);
+            }
+            else if (hex_distance(pos, {0, 0}) <= (HEX_RADIUS * 2) )
+            {
+                DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
+                DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, PURPLE);
+            }
+            else if (hex_distance(pos, {0, 0}) <= (HEX_RADIUS * 2) * 2)
+            {
+                DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
+                DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, GREEN);
             }
             else
             {
@@ -194,8 +231,6 @@ void UpdateDrawFrame(void)
     // Draw render texture to screen, scaled if required
     DrawTexturePro(target.texture, (Rectangle){0, 0, (float)target.texture.width, -(float)target.texture.height},
                    (Rectangle){0, 0, (float)target.texture.width, (float)target.texture.height}, (Vector2){0, 0}, 0.0f, WHITE);
-
-    // TODO: Draw everything that requires to be drawn at this point, maybe UI?
 
     EndDrawing();
     //----------------------------------------------------------------------------------
