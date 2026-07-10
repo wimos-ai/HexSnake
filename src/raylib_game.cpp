@@ -21,6 +21,8 @@
 #include <string.h> // Required for:
 #include <cmath>
 #include <array>
+#include <vector>
+#include <list>
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -63,7 +65,7 @@ static int frameCounter = 0;
 //----------------------------------------------------------------------------------
 static void UpdateDrawFrame(void); // Update and Draw one frame
 
-constexpr float HEX_RADIUS{30.0};
+constexpr float HEX_RADIUS{20.0};
 constexpr float HEX_ROT{30.0};
 constexpr float HEX_AXIS_THETA{60.0};
 constexpr float deg_to_rad(float f)
@@ -90,6 +92,8 @@ constexpr Vector2 hex_neighbors[] = {
     {0, -1},
     {-1, 1},
     {1, -1}};
+
+std::list<Vector2> snake{Vector2Zero()};
 
 /// @brief Returns the distance (in pixels) between two hex coordiantes
 /// @param v1
@@ -166,6 +170,27 @@ void UpdateDrawFrame(void)
     //----------------------------------------------------------------------------------
     // TODO: Update variables / Implement example logic at this point
 
+    int control_keys[] = {KEY_D, KEY_A, KEY_C, KEY_Q, KEY_Z, KEY_E};
+    Vector2 deltas[] = {{1, 0},
+                        {-1, 0},
+                        {0, 1},
+                        {0, -1},
+                        {-1, 1},
+                        {1, -1}};
+
+    for (size_t i = 0; i < std::size(control_keys); i++)
+    {
+        if (IsKeyPressed(control_keys[i]))
+        {
+            auto new_pose = Vector2Add(*snake.begin(), deltas[i]);
+            snake.push_front(new_pose);
+            if (!IsKeyDown(KEY_SPACE))
+            {
+                snake.pop_back();
+            }
+        }
+    }
+
     frameCounter++;
     //----------------------------------------------------------------------------------
 
@@ -199,27 +224,21 @@ void UpdateDrawFrame(void)
 
             auto cart_space1 = Vector2Add(hex_to_cartesian_space_v(pos), center);
 
-            if (pos.x == 0 && pos.y == 0)
-            {
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, BLACK);
-            }
-            else if (hex_distance(pos, {0, 0}) <= (HEX_RADIUS * 2) )
-            {
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, PURPLE);
-            }
-            else if (hex_distance(pos, {0, 0}) <= (HEX_RADIUS * 2) * 2)
-            {
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, WHITE);
-                DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, GREEN);
-            }
-            else
+            if (hex_distance(pos, {0, 0}) < HEX_RADIUS * 10)
             {
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, WHITE);
             }
         }
+    }
+
+    for (auto pose_ : snake)
+    {
+
+        auto pose = Vector2Add(hex_to_cartesian_space_v(pose_), center);
+
+        DrawPoly(pose, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
+        DrawPoly(pose, 6, HEX_RADIUS - 2, HEX_ROT, GREEN);
     }
 
     EndTextureMode();
