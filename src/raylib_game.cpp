@@ -23,6 +23,10 @@
 #include <array>
 #include <vector>
 #include <list>
+#include <cstdint>
+#include <unordered_set>
+#include <bit>
+#include <cstring>
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -39,13 +43,14 @@
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
-typedef enum
+enum class GameScreen
 {
-    SCREEN_LOGO = 0,
     SCREEN_TITLE,
     SCREEN_GAMEPLAY,
     SCREEN_ENDING
-} GameScreen;
+};
+
+GameScreen state{GameScreen::SCREEN_GAMEPLAY};
 
 // TODO: Define your custom data types here
 
@@ -93,7 +98,11 @@ constexpr Vector2 hex_neighbors[] = {
     {-1, 1},
     {1, -1}};
 
+Vector2 snake_velocity{hex_neighbors[0]};
+
 std::list<Vector2> snake{Vector2Zero()};
+
+uint64_t score{0};
 
 /// @brief Returns the distance (in pixels) between two hex coordiantes
 /// @param v1
@@ -164,11 +173,12 @@ int main(void)
 // Module Functions Definition
 //--------------------------------------------------------------------------------------------
 // Update and draw frame
-void UpdateDrawFrame(void)
+
+void UpdateDrawFrameGameplay(void)
 {
     // Update
     //----------------------------------------------------------------------------------
-    // TODO: Update variables / Implement example logic at this point
+    //
 
     int control_keys[] = {KEY_D, KEY_A, KEY_C, KEY_Q, KEY_Z, KEY_E};
     Vector2 deltas[] = {{1, 0},
@@ -182,12 +192,19 @@ void UpdateDrawFrame(void)
     {
         if (IsKeyPressed(control_keys[i]))
         {
-            auto new_pose = Vector2Add(*snake.begin(), deltas[i]);
-            snake.push_front(new_pose);
-            if (!IsKeyDown(KEY_SPACE))
-            {
-                snake.pop_back();
-            }
+            snake_velocity = deltas[i];
+        }
+    }
+
+    if (frameCounter % 20 == 0)
+    {
+        auto new_pose = Vector2Add(*snake.begin(), snake_velocity);
+        snake.push_front(new_pose);
+        auto it_end = snake.end();
+        if (!IsKeyDown(KEY_SPACE))
+        {
+            snake.pop_back();
+            score++;
         }
     }
 
@@ -206,13 +223,6 @@ void UpdateDrawFrame(void)
     center.x = screenWidth / 2;
     center.y = screenHeight / 2;
 
-    // for (auto hex : hex_neighbors)
-    // {
-    //     auto cart_space1 = Vector2Add(hex_to_cartesian_space_v(hex), center);
-    //     DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
-    //     DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, WHITE);
-    // }
-
     int n = 10;
     for (int dhx = -n; dhx < n; dhx++)
     {
@@ -224,21 +234,28 @@ void UpdateDrawFrame(void)
 
             auto cart_space1 = Vector2Add(hex_to_cartesian_space_v(pos), center);
 
-            if (hex_distance(pos, {0, 0}) < HEX_RADIUS * 10)
+            if (hex_distance(pos, {0, 0}) < (HEX_RADIUS * 10) + 10)
             {
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
                 DrawPoly(cart_space1, 6, HEX_RADIUS - 2, HEX_ROT, WHITE);
             }
         }
     }
-
+    Vector3 start_color{GREEN.r, GREEN.g, GREEN.b};
+    Vector3 end_color{RED.r, RED.g, RED.b};
+    auto delta = Vector3Scale(Vector3Subtract(end_color, start_color), 1.0 / snake.size());
+    size_t idx{0};
     for (auto pose_ : snake)
     {
 
         auto pose = Vector2Add(hex_to_cartesian_space_v(pose_), center);
 
         DrawPoly(pose, 6, HEX_RADIUS - 1, HEX_ROT, BLACK);
-        DrawPoly(pose, 6, HEX_RADIUS - 2, HEX_ROT, GREEN);
+
+        auto color = Vector3Add(start_color, Vector3Scale(delta, idx));
+
+        DrawPoly(pose, 6, HEX_RADIUS - 2, HEX_ROT, {static_cast<unsigned char>(color.x), static_cast<unsigned char>(color.y), static_cast<unsigned char>(color.z), 255});
+        idx++;
     }
 
     EndTextureMode();
@@ -253,4 +270,59 @@ void UpdateDrawFrame(void)
 
     EndDrawing();
     //----------------------------------------------------------------------------------
+
+    // Test boarder collision
+    if (frameCounter % 20 == 0 && hex_distance(*snake.begin(), {0, 0}) >= (HEX_RADIUS * 10) + 10)
+    {
+        state = GameScreen::SCREEN_ENDING;
+    }
+}
+
+void UpdateDrawFrameEnding(void)
+{
+    BeginTextureMode(target);
+    ClearBackground(RAYWHITE);
+
+    // TODO: Draw your game screen here
+
+    DrawRectangle(70, 90, 200, 200, BLACK);
+    DrawRectangle(70 + 16, 90 + 16, 200 - 32, 200 - 32, RAYWHITE);
+    DrawText("raylib", 70 + 200 - MeasureText("raylib", 40) - 32, 90 + 200 - 40 - 24, 40, BLACK);
+
+    DrawText("6.x", 290, 90 - 26, 280, BLACK);
+    DrawText("GAMEJAM", 70, 90 + 210, 120, MAROON);
+
+    if ((frameCounter / 20) % 2)
+        DrawText("are you ready?", 160, 500, 50, BLACK);
+
+    DrawRectangleLinesEx((Rectangle){0, 0, screenWidth, screenHeight}, 16, BLACK);
+
+    EndTextureMode();
+
+    // Render to screen (main framebuffer)
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+
+    // Draw render texture to screen, scaled if required
+    DrawTexturePro(target.texture, (Rectangle){0, 0, (float)target.texture.width, -(float)target.texture.height},
+                   (Rectangle){0, 0, (float)target.texture.width, (float)target.texture.height}, (Vector2){0, 0}, 0.0f, WHITE);
+
+    // TODO: Draw everything that requires to be drawn at this point, maybe UI?
+
+    EndDrawing();
+}
+
+void UpdateDrawFrame(void)
+{
+    switch (state)
+    {
+    case GameScreen::SCREEN_TITLE:
+        break;
+    case GameScreen::SCREEN_GAMEPLAY:
+        UpdateDrawFrameGameplay();
+        break;
+    case GameScreen::SCREEN_ENDING:
+        UpdateDrawFrameEnding();
+        break;
+    }
 }
